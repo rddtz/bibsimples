@@ -130,7 +130,7 @@ Isso gera os arquivos do site dentro de `backend\static\`.
 
 Volte para a raiz do projeto e dê duplo clique em **`iniciar.bat`**.
 
-O sistema abre automaticamente no navegador em `http://localhost:8000`.
+O sistema abre automaticamente no navegador em `http://localhost:8765`.
 
 Para fechar, feche a janela de terminal que foi aberta.
 
