@@ -93,6 +93,7 @@ yarn-error.log*
 # Build outputs
 /frontend/dist
 /frontend/build
+/backend/static
 
 # Dependency directories
 jspm_packages/
@@ -159,7 +160,7 @@ $RECYCLE.BIN/
 
 # Local data
 backend/data/
-data/
+/data/
 
 # Logs
 *.log

@@ -1,0 +1,39 @@
+# Lista de categorias CDD — edite à vontade!
+# Formato: codigo,Nome da categoria
+# Linhas começando com # são comentários e são ignoradas.
+
+028,Leitura e outras fontes de informação
+100,Filosofia
+150,Psicologia
+200,Religião
+300,Ciências Sociais
+370,Educação
+400,Linguagem e Linguística
+469,Língua Portuguesa
+500,Ciências Naturais e Matemática
+510,Matemática
+520,Astronomia
+530,Física
+540,Química
+550,Ciências da Terra e Geologia
+560,Paleontologia
+570,Biologia
+590,Zoologia
+600,Tecnologia (Ciências Aplicadas)
+610,Medicina e Saúde
+630,Agricultura
+700,Artes e Recreação
+741.5,Histórias em Quadrinhos
+793,Jogos, Brinquedos e Passatempos
+800,Literatura (geral)
+860,Literaturas Ibérica e Ibero-americana
+869,Literatura Brasileira (geral)
+869.0(81),Romance Brasileiro
+869.1,Poesia Brasileira
+869.2,Teatro Brasileiro
+869.3,Conto Brasileiro
+900,História e Geografia
+910,Geografia e Viagens
+920,Biografia
+980,História da América do Sul
+981,História do Brasil
