@@ -36,11 +36,13 @@ Variáveis de ambiente:
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 
@@ -139,26 +141,6 @@ app.add_middleware(
 # Rotas Básicas
 # ==============================================================================
 
-@app.get(
-    "/",
-    tags=["Root"],
-    summary="Página inicial",
-    response_description="Informações básicas da API",
-)
-async def root():
-    """
-    Retorna informações básicas sobre a API.
-    
-    Use para verificar se a API está online e obter links úteis.
-    """
-    return {
-        "name": settings.app_title,
-        "version": settings.app_version,
-        "docs": "/docs",
-        "redoc": "/redoc",
-        "api": "/api/v1",
-    }
-
 
 @app.get(
     "/health",
@@ -192,6 +174,12 @@ async def health_check():
 from app.api.v1 import router as api_v1_router
 
 app.include_router(api_v1_router, prefix="/api/v1")
+
+# Serve frontend static files (built with `npm run build` from frontend/)
+# Must be mounted AFTER all API routes so /api/... takes priority
+_static_dir = Path(__file__).parent.parent / "static"
+if _static_dir.exists():
+    app.mount("/", StaticFiles(directory=_static_dir, html=True), name="frontend")
 
 
 # ==============================================================================
