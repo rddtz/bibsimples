@@ -1,0 +1,75 @@
+# ============================================================================
+# bibsimples - Backend Dependencies
+# ============================================================================
+#
+# Este arquivo lista todas as dependências do backend.
+# Todas as bibliotecas foram escolhidas para serem cross-platform
+# (Windows, Linux, macOS).
+#
+# Para instalar: pip install -r requirements.txt
+# ============================================================================
+
+# ------------------------------------------------------------------------------
+# Web Framework
+# ------------------------------------------------------------------------------
+# FastAPI: Framework web moderno e assíncrono
+# - Documentação automática (Swagger/OpenAPI)
+# - Validação de dados via Pydantic
+# - Alto desempenho (baseado em Starlette)
+fastapi>=0.109.0
+
+# Uvicorn: Servidor ASGI para rodar o FastAPI
+# - "standard" inclui watchfiles para reload automático
+uvicorn[standard]>=0.27.0
+
+# ------------------------------------------------------------------------------
+# HTTP Client
+# ------------------------------------------------------------------------------
+# httpx: Cliente HTTP moderno com suporte async
+# - Substitui requests para código assíncrono
+# - Gerenciamento automático de cookies/sessões
+# - API similar ao requests (fácil migração)
+httpx>=0.26.0
+
+# ------------------------------------------------------------------------------
+# Validação e Serialização
+# ------------------------------------------------------------------------------
+# Pydantic: Validação de dados e settings
+# - Já vem com FastAPI, mas explicitamos a versão
+# - pydantic-settings para carregar configurações de .env
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# ------------------------------------------------------------------------------
+# Configuração
+# ------------------------------------------------------------------------------
+# python-dotenv: Carrega variáveis de .env
+# - Cross-platform
+# - Usado pelo pydantic-settings
+python-dotenv>=1.0.0
+
+# ------------------------------------------------------------------------------
+# Banco de Dados (Cache Local)
+# ------------------------------------------------------------------------------
+# aiosqlite: SQLite assíncrono
+# - SQLite já vem com Python, não precisa instalar nada
+# - Cross-platform por definição
+aiosqlite>=0.19.0
+
+# ------------------------------------------------------------------------------
+# Utilidades
+# ------------------------------------------------------------------------------
+# Unidecode: Normalização de texto (remove acentos)
+# - Útil para geração de código Cutter
+Unidecode>=1.3.0
+
+# ------------------------------------------------------------------------------
+# Testes
+# ------------------------------------------------------------------------------
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
+
+# respx: Mock para httpx em testes
+# - Permite simular respostas do Biblivre sem servidor real
+respx>=0.20.0

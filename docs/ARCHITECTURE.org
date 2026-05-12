@@ -1,0 +1,316 @@
+#+TITLE: bibsimples - Arquitetura e Decisões Técnicas
+#+AUTHOR: bibsimples Team
+#+DATE: 2026-04-07
+#+OPTIONS: toc:3 num:t
+
+* Visão Geral
+** O que é o bibsimples?
+
+bibsimples é uma interface moderna para o sistema Biblivre, projetada para:
+- Eliminar a fragilidade do web scraping com Selenium
+- Oferecer uma experiência de usuário (UX) muito superior
+- Manter consistência total com os dados do Biblivre
+
+** Problema que Resolve
+
+O Biblivre é um excelente sistema de bibliotecas open-source, mas:
+1. Sua interface é datada e pouco intuitiva
+2. Não possui API REST documentada
+3. Automatizações via Selenium quebram frequentemente
+
+** Nossa Solução
+
+Descobrimos que o Biblivre possui uma *API JSON interna* não documentada,
+usada pelo próprio frontend. Aproveitamos essa API para criar uma camada
+de abstração robusta.
+
+* Arquitetura do Sistema
+** Diagrama de Componentes
+
+#+BEGIN_SRC text
+┌─────────────────────────────────────────────────────────────┐
+│                     bibsimples Application                     │
+├─────────────────────┬───────────────────────────────────────┤
+│     Frontend        │              Backend                  │
+│    (React + Vite)   │             (FastAPI)                 │
+├─────────────────────┼───────────────────────────────────────┤
+│  - Dashboard        │  - BiblioClient (HTTP wrapper)        │
+│  - Catalogação      │  - REST API (/api/v1/*)               │
+│  - Pesquisa         │  - Autenticação/Sessão                │
+│  - Empréstimos      │  - Cache (SQLite)                     │
+│  - Relatórios       │  - Validações                         │
+└─────────────────────┴───────────────────────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────────┐
+                    │   Biblivre Server   │
+                    │ (JSON API existente)│
+                    └─────────────────────┘
+#+END_SRC
+
+** Fluxo de Dados
+
+1. Usuário interage com o Frontend (React)
+2. Frontend faz requisição para Backend (FastAPI)
+3. Backend valida e processa a requisição
+4. Backend comunica com Biblivre via BiblioClient
+5. Resposta é formatada e retornada ao Frontend
+
+* Decisões Técnicas
+** Backend: Por que FastAPI?
+
+| Alternativa | Prós | Contras | Decisão |
+|-------------+------+---------+---------|
+| FastAPI     | Async, tipagem, docs automática, moderno | Menor ecossistema que Django | ✓ ESCOLHIDO |
+| Django      | Maduro, muitos plugins | Pesado para API simples, sync-first | ✗ |
+| Flask       | Simples, flexível | Sem tipagem nativa, async manual | ✗ |
+| Express.js  | Popular, grande comunidade | Exigiria mudar de Python | ✗ |
+
+*Justificativa Final:*
+- O código existente já usa Python
+- FastAPI tem documentação automática (Swagger/OpenAPI)
+- Suporte nativo a async (ideal para I/O com Biblivre)
+- Validação de dados com Pydantic (menos bugs)
+- Excelente para Windows/Linux/Mac
+
+** Cliente HTTP: Por que httpx?
+
+| Biblioteca | Prós | Contras |
+|------------+------+---------|
+| httpx      | Async nativo, API moderna, cookies | Menos conhecido |
+| requests   | Muito popular, simples | Sync apenas, cookies manuais |
+| aiohttp    | Async, maduro | API mais complexa |
+
+*Escolha:* ~httpx~ com suporte a async e gerenciamento automático de cookies/sessão.
+
+** Frontend: Por que React + Vite?
+
+| Stack | Prós | Contras |
+|-------+------+---------|
+| React + Vite | Rápido, HMR, TypeScript nativo, grande ecossistema | - |
+| Vue + Vite | Mais simples, menos boilerplate | Ecossistema menor |
+| Angular | Enterprise, tudo incluso | Pesado, curva de aprendizado |
+| NiceGUI (atual) | Python puro | Menos flexível, menos componentes |
+
+*Justificativa:*
+- NiceGUI atual é limitado para interfaces complexas
+- React tem mais componentes prontos
+- Vite é extremamente rápido para desenvolvimento
+- TailwindCSS permite estilização rápida e consistente
+
+** Código Cutter: Implementação Local
+
+O código atual usa web scraping em ~tabelacutter.com~. Problemas:
+1. Depende de internet
+2. Site pode mudar ou cair
+3. Lento (abre navegador)
+
+*Solução:* Implementar o algoritmo de Cutter-Sanborn localmente.
+A tabela Cutter é um conjunto finito de regras que pode ser
+implementado em código.
+
+* Compatibilidade Windows
+** Requisitos
+
+O sistema deve rodar em Windows sem dependências específicas de Linux.
+
+** Cuidados Tomados
+
+1. *Caminhos de arquivo:* Usar ~pathlib.Path~ ao invés de strings
+2. *Processos:* Evitar ~fork()~, usar ~subprocess~ ou ~multiprocessing~
+3. *Variáveis de ambiente:* Usar ~python-dotenv~ compatível
+4. *Dependências:* Todas as libs escolhidas são cross-platform
+
+** Execução Recomendada
+
+#+BEGIN_SRC shell
+# Windows
+python -m uvicorn app.main:app --reload
+
+# Ou via script
+python run.py
+#+END_SRC
+
+* API do Biblivre (Descoberta)
+** Endpoints Identificados
+
+A partir da análise do código-fonte do Biblivre 5.x, identificamos:
+
+*** Autenticação
+#+BEGIN_SRC text
+POST /Biblivre5/{schema}
+  controller=json
+  module=login
+  action=login
+  username={user}
+  password={pass}
+#+END_SRC
+
+*** Pesquisa
+#+BEGIN_SRC text
+GET /Biblivre5/{schema}
+  controller=json
+  module=cataloging.bibliographic
+  action=search
+  search_parameters={
+    "search_mode": "simple",
+    "database": "main",
+    "material_type": "all",
+    "search_terms": [{"query": "termo"}]
+  }
+  # Nota: a chave correta é "search_mode" (lida em SearchQueryDTO.java).
+  # Versões antigas e alguns exemplos usam "search_type" — manter compatibilidade
+  # enviando ambos não é necessário, mas o cliente atual o faz por segurança.
+#+END_SRC
+
+*** Abrir Registro
+#+BEGIN_SRC text
+GET /Biblivre5/{schema}
+  controller=json
+  module=cataloging.bibliographic
+  action=open
+  id={record_id}
+#+END_SRC
+
+*** Salvar Registro
+#+BEGIN_SRC text
+POST /Biblivre5/{schema}
+  controller=json
+  module=cataloging.bibliographic
+  action=save
+  id={0 para novo}
+  from={FORM|MARC}
+  material_type={tipo}
+  database={work|main|private}
+  data={json_ou_marc}
+#+END_SRC
+
+** Observações
+
+- O ~{schema}~ é geralmente "default" ou nome da biblioteca
+- Sessão é mantida via cookies (JSESSIONID)
+- Respostas são JSON com campo ~success~ booleano
+- Na instância da escola, a URL real é ~/Biblivre4/default/~ (apesar do app ser Biblivre 5). Barra final é obrigatória em GETs.
+
+** Endpoints de Circulação (Patrons + Empréstimos)
+
+Descobertos lendo ~consult/Biblivre-5/src/java/biblivre/circulation/~. Todos
+seguem o mesmo padrão ~/{schema}/?controller=json&module=X&action=Y~.
+
+*** Patrons (~module=circulation.user~)
+- ~action=open~ — busca patron por ID. Param: ~id~. Resposta: ~{user: {...}}~.
+- ~action=search~ / ~action=paginate~ — pesquisa patrons. Param: ~search_parameters~ (JSON).
+  Campos do JSON (de ~UserSearchDTO.java~): ~search_mode~, ~field~, ~query~, ~type~,
+  ~users_with_pending_fines~, ~users_with_late_lendings~, ~users_who_have_login_access~,
+  ~users_without_user_card~, ~inactive_users_only~, ~created_start~, ~created_end~,
+  ~modified_start~, ~modified_end~. Também aceita ~limit~/~offset~/~page~ na query.
+- ~action=save~ — cria (id=0) ou atualiza patron. Params: ~id~, ~name~, ~status~
+  (enum: ~active~, ~pending_issues~, ~inactive~, ~blocked~), ~type~ (id de UserType),
+  campos dinâmicos definidos em UserFields, e ~photo_data~ (base64 PNG, opcional).
+- ~action=delete~ — soft-delete (se ~ACTIVE~ vira ~INACTIVE~) ou hard-delete (se já ~INACTIVE~). Param: ~id~.
+- ~action=loadTabData~ — histórico do patron. Params: ~id~, ~tab~ ∈ {~lendings~, ~reservations~, ~fines~}.
+- ~action=block~ / ~action=unblock~ — muda status. Param: ~user_id~.
+
+*** Empréstimos (~module=circulation.lending~)
+- ~action=search~ — busca exemplares (HOLDINGS) elegíveis para empréstimo.
+  Param: ~search_parameters~ JSON com ~{query, holding_list_lendings}~ (esse último filtra apenas os já emprestados). Aceita ~limit~ e ~page~.
+- ~action=userSearch~ — pesquisa patrons e devolve a lista de empréstimos atuais de cada um. Mesmos params do ~circulation.user.search~.
+- ~action=lend~ — *cria um empréstimo*. Params: ~holding_id~ (int), ~user_id~ (int).
+  Resposta: ~{data: LendingInfo, full_data: true}~ no sucesso.
+- ~action=renewLending~ — renova empréstimo. Param: ~id~ (lending id).
+- ~action=returnLending~ — devolve empréstimo. Params: ~id~ (lending id), ~fine~ (float, opcional), ~paid~ (boolean).
+- ~action=payFine~ — paga ou isenta multa. Params: ~fine_id~ (int), ~exempt~ (boolean, default false).
+- ~action=listAll~ — lista paginada de todos empréstimos ativos. Params: ~limit~, ~offset~.
+- ~action=printReceipt~ — gera HTML imprimível. Param: ~id_list~ (lending ids separados por vírgula).
+
+*** Cartões de Acesso (~module=circulation.accesscontrol~)
+- ~action=userSearch~ — pesquisa de patron focada em controle de acesso.
+- ~action=cardSearch~ — pesquisa por número/código do cartão.
+- ~action=bind~ — vincula um cartão a um patron.
+- ~action=unbind~ — desvincula.
+
+*** Reservas (~module=circulation.reservation~) — fora do escopo MVP, documentado
+para referência: ~search~, ~paginate~, ~userSearch~, ~reserve~, ~delete~, mais
+variantes ~self*~ para a interface do próprio patron.
+
+** Observações sobre Circulação
+
+- Para o fluxo de empréstimo do bibsimples, a sequência é:
+  1. ~circulation.user.search~ para encontrar o estudante (por nome/matrícula)
+  2. (Opcional) ~circulation.accesscontrol.cardSearch~ se a escola usar cartões
+  3. ~cataloging.bibliographic.search~ + ~open~ para identificar o livro
+  4. ~circulation.lending.lend~ com ~holding_id~ + ~user_id~ → grava no Biblivre
+  5. Em paralelo, gravar evento em ~loan_events~ local com snapshot de classe/turma.
+- O endpoint ~loadTabData~ com ~tab=lendings~ é a forma mais barata de obter
+  o histórico de um aluno sem chamar dois endpoints separados.
+
+* Estrutura de Arquivos
+** Backend
+
+#+BEGIN_SRC text
+backend/
+├── app/
+│   ├── __init__.py
+│   ├── main.py              # Ponto de entrada FastAPI
+│   ├── config.py            # Configurações via Pydantic Settings
+│   ├── biblivre/
+│   │   ├── __init__.py
+│   │   ├── client.py        # BiblioClient - core da comunicação
+│   │   ├── auth.py          # Login/logout
+│   │   ├── cataloging.py    # CRUD de registros
+│   │   ├── holdings.py      # Exemplares
+│   │   ├── search.py        # Pesquisas
+│   │   └── exceptions.py    # Erros específicos
+│   ├── api/
+│   │   ├── v1/
+│   │   │   ├── router.py    # Agrupa todas as rotas
+│   │   │   ├── auth.py
+│   │   │   ├── records.py
+│   │   │   └── search.py
+│   │   └── deps.py          # Dependências injetáveis
+│   ├── schemas/             # Pydantic models
+│   └── utils/
+│       ├── cutter.py        # Gerador Cutter local
+│       └── marc.py          # Helpers MARC
+├── tests/
+│   ├── conftest.py
+│   ├── test_client.py
+│   ├── test_cutter.py
+│   └── test_api.py
+├── requirements.txt
+└── run.py                   # Script de execução cross-platform
+#+END_SRC
+
+* Testes
+** Estratégia
+
+1. *Unit tests:* Funções isoladas (Cutter, validações)
+2. *Integration tests:* BiblioClient com mock do Biblivre
+3. *E2E tests:* API completa (opcional, requer Biblivre rodando)
+
+** Ferramentas
+
+- ~pytest~ - Framework de testes
+- ~pytest-asyncio~ - Suporte a async
+- ~respx~ - Mock para httpx
+- ~pytest-cov~ - Cobertura de código
+
+* Roadmap
+** Fase 1: MVP [0/6]
+- [ ] Setup backend
+- [ ] BiblioClient básico
+- [ ] Login/Logout
+- [ ] Pesquisa
+- [ ] Visualizar registro
+- [ ] Cadastrar livro
+
+** Fase 2: Completo [0/4]
+- [ ] Exemplares
+- [ ] Código Cutter local
+- [ ] Frontend React
+- [ ] Docker
+
+** Fase 3: Extra [0/3]
+- [ ] Cache offline
+- [ ] Empréstimos
+- [ ] Relatórios
