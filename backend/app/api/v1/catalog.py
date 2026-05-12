@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.biblivre import BiblioClient, BiblioNotFoundError
-from app.utils.cutter import generate_cutter_code, generate_book_code
+from app.utils.cutter import generate_cutter_code, generate_book_code, format_author_name
 
 from .auth import get_biblivre_client
 
@@ -175,7 +175,7 @@ async def create_book(
             },
         )
 
-    author_name = _normalize_text(payload.author_name)
+    author_name = format_author_name(_normalize_text(payload.author_name))
     title = _normalize_text(payload.title)
     cdd = _normalize_text(payload.cdd)
     volume = _normalize_text(payload.volume)

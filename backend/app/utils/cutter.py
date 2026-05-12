@@ -642,42 +642,26 @@ def format_author_name(name: str) -> str:
     if len(parts) == 1:
         return name
     
-    # Autores especiais conhecidos pelo primeiro nome
-    special_authors = {
-        "machado de assis",
-        "castro alves",
-        "padre antonio vieira",
-        "padre vieira",
-    }
-    
-    if name.lower() in special_authors:
-        return name
-    
     # Partículas que devem ficar com o sobrenome
     particles = {"de", "da", "do", "das", "dos", "e", "di", "del", "von", "van"}
     
     # Sufixos que devem ficar com o sobrenome
     suffixes = {"junior", "jr", "jr.", "filho", "neto", "sobrinho", "ii", "iii"}
     
-    # Encontra onde começa o sobrenome
-    surname_start = len(parts) - 1
-    
-    # Verifica se o último é um sufixo
+    # Surname is the last word; suffixes attach to it; particles stay with given names (AACR2)
+    surname_idx = len(parts) - 1
+    suffix_label = ""
     if parts[-1].lower() in suffixes and len(parts) > 2:
-        surname_start -= 1
-    
-    # Verifica se há partícula antes do sobrenome
-    while surname_start > 1 and parts[surname_start - 1].lower() in particles:
-        surname_start -= 1
-    
-    # Separa nome e sobrenome
-    given_names = parts[:surname_start]
-    surname_parts = parts[surname_start:]
-    
-    # Formata
-    surname = " ".join(surname_parts)
-    given = " ".join(given_names)
-    
+        suffix_label = parts.pop()
+        surname_idx = len(parts) - 1
+
+    surname = parts[surname_idx]
+    if suffix_label:
+        surname = f"{surname} {suffix_label}"
+
+    given_parts = parts[:surname_idx]
+    given = " ".join(given_parts)
+
     if given:
         return f"{surname}, {given}"
     else:
