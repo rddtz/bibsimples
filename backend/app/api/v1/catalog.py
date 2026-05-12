@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.biblivre import BiblioClient, BiblioNotFoundError
-from app.utils.cutter import generate_cutter_code
+from app.utils.cutter import generate_cutter_code, generate_book_code
 
 from .auth import get_biblivre_client
 
@@ -180,6 +180,16 @@ async def create_book(
     cdd = _normalize_text(payload.cdd)
     volume = _normalize_text(payload.volume)
     cutter_code = _normalize_text(payload.cutter_code) or generate_cutter_code(author_name)
+    # Append title letter if not already present (e.g. M149 → M149d)
+    if cutter_code and title and not cutter_code[-1].islower():
+        articles = ["o ", "a ", "os ", "as ", "um ", "uma ", "the ", "an ", "a "]
+        t = title.lower()
+        for art in articles:
+            if t.startswith(art):
+                t = t[len(art):]
+                break
+        if t:
+            cutter_code = f"{cutter_code}{t[0]}"
 
     bibliographic_data = _build_bibliographic_form_data(
         author_name=author_name,

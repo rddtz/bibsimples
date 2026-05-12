@@ -1,6 +1,16 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { catalogApi, utilsApi, SimilarRecord } from '../services/api'
+import cddRaw from '../data/cddPresets.csv?raw'
+
+const CDD_PRESETS = cddRaw
+  .split('\n')
+  .map((l) => l.trim())
+  .filter((l) => l && !l.startsWith('#'))
+  .map((l) => {
+    const comma = l.indexOf(',')
+    return { code: l.slice(0, comma).trim(), label: l.slice(comma + 1).trim() }
+  })
 
 interface CatalogResponse {
   record_id: number
@@ -34,22 +44,27 @@ export default function CatalogPage() {
   const [error, setError] = useState('')
   const [result, setResult] = useState<ResultBanner>(null)
   const [duplicates, setDuplicates] = useState<SimilarRecord[] | null>(null)
+  const [checkStatus, setCheckStatus] = useState<'not_found' | null>(null)
 
   const cutterMutation = useMutation({
     mutationFn: (name: string) => utilsApi.generateCutter(name),
-    onSuccess: (data) => setCutterCode(data.cutter_code),
+    onSuccess: (data) => {
+      let code = data.cutter_code
+      const t = title.trim()
+      if (t && !code[code.length - 1]?.match(/[a-z]/)) {
+        const articles = ['o ', 'a ', 'os ', 'as ', 'um ', 'uma ', 'the ', 'an ', 'a ']
+        let tl = t.toLowerCase()
+        for (const art of articles) {
+          if (tl.startsWith(art)) { tl = tl.slice(art.length); break }
+        }
+        if (tl) code = `${code}${tl[0]}`
+      }
+      setCutterCode(code)
+    },
   })
 
   const similarMutation = useMutation({
     mutationFn: () => catalogApi.findSimilar(title.trim(), authorName.trim()),
-    onSuccess: (data) => {
-      if (data.matches.length > 0) {
-        setDuplicates(data.matches)
-      } else {
-        // Nada parecido — segue direto para criação
-        createBookMutation.mutate()
-      }
-    },
     onError: (err: Error) => setError(err.message || 'Erro ao verificar duplicatas'),
   })
 
@@ -67,11 +82,7 @@ export default function CatalogPage() {
       setError('')
       setDuplicates(null)
       setResult({ kind: 'created', data })
-      // Limpa apenas título / CDD / volume — autor frequentemente é repetido
       setTitle('')
-      setCdd('')
-      setVolume('')
-      setCopies(1)
     },
     onError: (err: Error) => {
       setResult(null)
@@ -87,9 +98,6 @@ export default function CatalogPage() {
       setDuplicates(null)
       setResult({ kind: 'copies', data, matched: variables.record })
       setTitle('')
-      setCdd('')
-      setVolume('')
-      setCopies(1)
     },
     onError: (err: Error) => setError(err.message || 'Erro ao adicionar exemplares'),
   })
@@ -99,12 +107,49 @@ export default function CatalogPage() {
     if (normalized) cutterMutation.mutate(normalized)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleCheckExists = async () => {
+    if (!title.trim()) return
+    setCheckStatus(null)
+    setError('')
+    try {
+      const similar = await similarMutation.mutateAsync()
+      if (similar.matches.length > 0) {
+        setDuplicates(similar.matches)
+      } else {
+        setCheckStatus('not_found')
+      }
+    } catch {
+      // error handled by similarMutation.onError
+    }
+  }
+
+  const handleClear = () => {
+    setAuthorName('')
+    setTitle('')
+    setCdd('')
+    setCutterCode('')
+    setCopies(1)
+    setVolume('')
+    setError('')
+    setResult(null)
+    setDuplicates(null)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setResult(null)
     if (!authorName.trim() || !title.trim() || !cdd.trim() || copies < 1) return
-    similarMutation.mutate()
+    try {
+      const similar = await similarMutation.mutateAsync()
+      if (similar.matches.length > 0) {
+        setDuplicates(similar.matches)
+      } else {
+        createBookMutation.mutate()
+      }
+    } catch {
+      // error handled by similarMutation.onError
+    }
   }
 
   const handleProceedAsNew = () => {
@@ -160,14 +205,30 @@ export default function CatalogPage() {
             </Field>
 
             <Field label="Título do livro" required>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Dom Casmurro"
-                className={inputClass}
-                required
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => { setTitle(e.target.value); setCheckStatus(null) }}
+                  placeholder="Dom Casmurro"
+                  className={inputClass}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={handleCheckExists}
+                  disabled={!title.trim() || similarMutation.isPending}
+                  className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {similarMutation.isPending ? 'Buscando…' : 'Verificar'}
+                </button>
+              </div>
+              {checkStatus === 'not_found' && (
+                <p className="mt-1.5 text-sm text-slate-500 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" />
+                  Não encontrado no acervo — pode catalogar como novo.
+                </p>
+              )}
             </Field>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -182,14 +243,7 @@ export default function CatalogPage() {
               </Field>
 
               <Field label="CDD" required>
-                <input
-                  type="text"
-                  value={cdd}
-                  onChange={(e) => setCdd(e.target.value)}
-                  placeholder="869.93"
-                  className={inputClass}
-                  required
-                />
+                <CddSelect value={cdd} onChange={setCdd} />
               </Field>
             </div>
 
@@ -216,7 +270,15 @@ export default function CatalogPage() {
               </Field>
             </div>
 
-            <div className="pt-2">
+            <div className="pt-2 flex gap-3">
+              <button
+                type="button"
+                onClick={handleClear}
+                disabled={isWorking}
+                className="px-4 py-3 bg-white border border-slate-300 hover:border-slate-400 text-slate-600 font-medium rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Limpar
+              </button>
               <button
                 type="submit"
                 disabled={
@@ -226,7 +288,7 @@ export default function CatalogPage() {
                   copies < 1 ||
                   isWorking
                 }
-                className="w-full py-3 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-medium rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex-1 py-3 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-medium rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {similarMutation.isPending
                   ? 'Verificando…'
@@ -289,8 +351,8 @@ export default function CatalogPage() {
       {duplicates && (
         <DuplicatesModal
           duplicates={duplicates}
-          newCopies={copies}
-          onAddCopies={(record) => addCopiesMutation.mutate({ record, qty: copies })}
+          initialCopies={copies}
+          onAddCopies={(record, qty) => addCopiesMutation.mutate({ record, qty })}
           onProceedAsNew={handleProceedAsNew}
           onClose={() => setDuplicates(null)}
           working={addCopiesMutation.isPending || createBookMutation.isPending}
@@ -302,6 +364,88 @@ export default function CatalogPage() {
 
 const inputClass =
   'w-full px-3.5 py-2.5 text-slate-900 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition'
+
+
+function CddSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const isPreset = CDD_PRESETS.some((p) => p.code === value)
+  const [mode, setMode] = useState<'text' | 'list'>(isPreset ? 'list' : 'text')
+
+  if (mode === 'list') {
+    return (
+      <div className="flex gap-2">
+        <select
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value)
+          }}
+          className={inputClass}
+          required
+        >
+          <option value="">Selecione a categoria…</option>
+          {CDD_PRESETS.map((p) => (
+            <option key={p.code} value={p.code}>
+              {p.code} — {p.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => { onChange(''); setMode('text') }}
+          className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+        >
+          ← Digitar
+        </button>
+      </div>
+    )
+  }
+
+  const [open, setOpen] = useState(false)
+  const suggestions = value.trim()
+    ? CDD_PRESETS.filter(
+        (p) =>
+          p.code.toLowerCase().includes(value.toLowerCase()) ||
+          p.label.toLowerCase().includes(value.toLowerCase())
+      )
+    : []
+
+  return (
+    <div className="flex gap-2">
+      <div className="relative flex-1">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => { onChange(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder="Ex: 869.0(81)"
+          className={inputClass}
+          required
+        />
+        {open && suggestions.length > 0 && (
+          <ul className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-auto">
+            {suggestions.map((p) => (
+              <li
+                key={p.code}
+                onMouseDown={() => { onChange(p.code); setOpen(false) }}
+                className="px-3.5 py-2.5 cursor-pointer hover:bg-primary-50 flex items-baseline gap-2"
+              >
+                <span className="text-sm font-medium text-slate-900 shrink-0">{p.code}</span>
+                <span className="text-xs text-slate-500 truncate">{p.label}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={() => { onChange(''); setMode('list') }}
+        className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+      >
+        Ver lista
+      </button>
+    </div>
+  )
+}
 
 function Field({
   label,
@@ -365,19 +509,21 @@ function SuccessCard({
 
 function DuplicatesModal({
   duplicates,
-  newCopies,
+  initialCopies,
   onAddCopies,
   onProceedAsNew,
   onClose,
   working,
 }: {
   duplicates: SimilarRecord[]
-  newCopies: number
-  onAddCopies: (record: SimilarRecord) => void
+  initialCopies: number
+  onAddCopies: (record: SimilarRecord, qty: number) => void
   onProceedAsNew: () => void
   onClose: () => void
   working: boolean
 }) {
+  const [qty, setQty] = useState(initialCopies)
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
@@ -392,8 +538,38 @@ function DuplicatesModal({
             Encontramos {duplicates.length} registro{duplicates.length === 1 ? '' : 's'} parecido{duplicates.length === 1 ? '' : 's'}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Esse livro já está no acervo? Adicione mais exemplares ao registro existente em vez de duplicar.
+            Esse livro já está no acervo? Adicione exemplares ao registro existente em vez de duplicar.
           </p>
+          <div className="mt-4 flex items-center gap-3">
+            <span className="text-sm font-medium text-slate-700">Exemplares a adicionar:</span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setQty(q => Math.max(1, q - 1))}
+                disabled={working || qty <= 1}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-600 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min={1}
+                max={999}
+                value={qty}
+                onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
+                disabled={working}
+                className="w-16 text-center px-2 py-1.5 text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setQty(q => q + 1)}
+                disabled={working}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-600 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                +
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto px-3 py-2">
@@ -409,11 +585,11 @@ function DuplicatesModal({
                 </div>
                 <button
                   type="button"
-                  onClick={() => onAddCopies(d)}
+                  onClick={() => onAddCopies(d, qty)}
                   disabled={working}
                   className="shrink-0 px-3.5 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  + {newCopies} exemplar{newCopies === 1 ? '' : 'es'} aqui
+                  + {qty} exemplar{qty === 1 ? '' : 'es'} aqui
                 </button>
               </li>
             ))}
