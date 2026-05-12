@@ -1,133 +1,220 @@
 # bibsimples
 
-Interface moderna para o sistema Biblivre.
+Interface simplificada para o Biblivre, focada nas operações do dia a dia da biblioteca escolar: catalogar livros, pesquisar o acervo e gerenciar exemplares.
 
-## 🎯 Sobre
+---
 
-bibsimples é uma aplicação que funciona como intermediária entre o usuário e o Biblivre, oferecendo:
-
-- **Interface moderna** - UI limpa e responsiva com React + TailwindCSS
-- **Estabilidade** - Usa a API JSON interna do Biblivre (não web scraping)
-- **Código Cutter local** - Geração sem dependência de sites externos
-- **Consistência** - Dados sempre sincronizados com o Biblivre
-
-## 📁 Estrutura
-
-```
-bibsimples/
-├── backend/          # API FastAPI (Python)
-│   ├── app/          # Código principal
-│   │   ├── biblivre/ # Cliente para Biblivre
-│   │   ├── api/      # Endpoints REST
-│   │   └── utils/    # Utilitários (Cutter, etc.)
-│   └── tests/        # Testes
-├── frontend/         # UI React (TypeScript)
-│   ├── src/          # Código fonte
-│   └── dist/         # Build de produção
-└── docs/             # Documentação
-```
-
-## 🚀 Início Rápido
-
-### Requisitos
+## Requisitos
 
 - Python 3.11+
-- Node.js 18+ (para desenvolvimento frontend)
-- Servidor Biblivre 5.x rodando
+- Node.js 18+
+- Biblivre 5 rodando na mesma máquina (em `http://localhost:8080/Biblivre5`)
 
-### Backend
+---
 
-```bash
-cd backend
+## Instalação (primeira vez)
 
-# Crie ambiente virtual
-python3 -m venv venv
+### 0. Instalar Python e Node.js
 
-# Ative o ambiente (Windows)
-venv\Scripts\activate
+Esses dois programas precisam ser instalados antes de qualquer coisa. Só precisa ser feito uma vez.
 
-# Ative o ambiente (Linux/Mac)
-source venv/bin/activate
+**Python:**
 
-# Instale dependências
-pip install -r requirements.txt
+1. Acesse https://www.python.org/downloads/ e clique em **"Download Python 3.x.x"**
+2. Execute o instalador
+3. **IMPORTANTE:** na primeira tela, marque a caixa **"Add Python to PATH"** antes de clicar em Install
+4. Clique em **"Install Now"** e aguarde
 
-# Copie e configure o .env
-cp .env.example .env
-# Edite .env com suas configurações
-# Exemplo para Biblivre em outro computador:
-# BIBSIMPLES_BIBLIVRE_URL=http://172.16.3.208:8080/Biblivre5
+Para confirmar que funcionou, abra o Prompt de Comando (`Win + R` → digite `cmd` → Enter) e rode:
+```
+python --version
+```
+Deve aparecer algo como `Python 3.11.x`.
 
-# Execute
-python run.py
+---
+
+**Node.js:**
+
+1. Acesse https://nodejs.org/ e clique no botão de download da versão **LTS**
+2. Execute o instalador e clique em Next em todas as telas (as opções padrão estão corretas)
+3. Aguarde a instalação terminar
+
+Para confirmar, no Prompt de Comando:
+```
+node --version
+```
+Deve aparecer algo como `v20.x.x`.
+
+> **Nota:** Após instalar Python ou Node.js, feche e abra novamente o Prompt de Comando para que eles sejam reconhecidos.
+
+---
+
+### 1. Baixar o código
+
+**Opção A — via Git (recomendado para receber atualizações facilmente):**
+
+1. Acesse https://git-scm.com/download/win e baixe o instalador
+2. Execute e clique em Next em todas as telas (as opções padrão estão corretas)
+3. Abra o Prompt de Comando e rode:
+
+```
+git clone https://github.com/seu-usuario/bibsimples.git
+cd bibsimples
 ```
 
-Acesse: http://localhost:8000/docs
+**Opção B — baixar o ZIP:**
 
-### Frontend
+1. Acesse a página do projeto no GitHub
+2. Clique em **Code → Download ZIP**
+3. Extraia o ZIP em uma pasta de sua escolha (ex: `C:\bibsimples`)
+4. Abra o Prompt de Comando e navegue até a pasta:
 
-```bash
-cd frontend
+```
+cd C:\bibsimples
+```
 
-# Instale dependências
+---
+
+### 2. Configurar o backend
+
+Entre na pasta `backend`:
+
+```
+cd backend
+```
+
+Crie o ambiente virtual e instale as dependências:
+
+```
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Copie o arquivo de configuração:
+
+```
+copy .env.example .env
+```
+
+Abra o `.env` em qualquer editor de texto e ajuste:
+
+```
+# URL do Biblivre — deixe assim se ele roda na mesma máquina na porta padrão
+BIBSIMPLES_BIBLIVRE_URL=http://localhost:8080/Biblivre5/
+
+# Schema do Biblivre — deixe vazio para instalações padrão
+BIBSIMPLES_BIBLIVRE_SCHEMA=
+```
+
+> Se o Biblivre usa uma porta diferente (ex: 80 ou 8180), ajuste apenas o número.
+
+---
+
+### 3. Compilar o frontend
+
+Entre na pasta `frontend`:
+
+```
+cd ..\frontend
 npm install
-
-# Servidor de desenvolvimento
-npm run dev
-
-# Build de produção
 npm run build
 ```
 
-Acesse: http://localhost:3000
+Isso gera os arquivos do site dentro de `backend\static\`.  
+**Só precisa ser feito uma vez** (ou quando atualizar o código).
 
-### Testes
+---
 
-```bash
-cd backend
+### 4. Pronto
 
-# Todos os testes
-pytest
+Volte para a raiz do projeto e dê duplo clique em **`iniciar.bat`**.
 
-# Com cobertura
-pytest --cov=app
+O sistema abre automaticamente no navegador em `http://localhost:8000`.
+
+Para fechar, feche a janela de terminal que foi aberta.
+
+---
+
+## Uso no dia a dia
+
+Basta dar duplo clique em **`iniciar.bat`**. O navegador abre sozinho.
+
+---
+
+## Personalizar as categorias CDD
+
+O arquivo de categorias fica em:
+
+```
+frontend\src\data\cddPresets.csv
 ```
 
-## 📖 API
+Abra em qualquer editor de texto (ex: Bloco de Notas). O formato é simples — uma categoria por linha:
 
-### Endpoints Principais
+```
+codigo,Nome da categoria
+869.0(81),Romance Brasileiro
+981,História do Brasil
+```
 
-| Método | Endpoint | Descrição |
-|--------|----------|-----------|
-| POST | /api/v1/auth/login | Login no Biblivre |
-| POST | /api/v1/auth/logout | Logout |
-| POST | /api/v1/catalog/books | Catalogar livro + exemplares |
-| GET | /api/v1/search | Pesquisar acervo |
-| POST | /api/v1/utils/cutter | Gerar código Cutter |
-| POST | /api/v1/utils/book-code | Gerar código do livro |
+Linhas que começam com `#` são comentários e são ignoradas.
 
-Veja documentação completa em `/docs` após iniciar o servidor.
+Após editar, recompile o frontend:
 
-## 🛠️ Tecnologias
+```
+cd frontend
+npm run build
+```
 
-### Backend
-- **FastAPI** - Framework web assíncrono
-- **httpx** - Cliente HTTP async
-- **Pydantic** - Validação de dados
-- **pytest** - Testes
+---
 
-### Frontend
-- **React 18** - UI Library
-- **TypeScript** - Tipagem estática
-- **TailwindCSS** - Estilização
-- **Vite** - Build tool
-- **React Query** - Data fetching
-- **Zustand** - Estado global
+## Atualizar o sistema
 
-## 📝 Licença
+```
+git pull
+cd frontend
+npm install
+npm run build
+cd ..\backend
+venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-MIT
+Depois use o `iniciar.bat` normalmente.
 
-## 🤝 Contribuindo
+---
 
-Contribuições são bem-vindas!
+## Estrutura do projeto
+
+```
+bibsimples/
+├── iniciar.bat          ← duplo clique para abrir o sistema
+├── backend/
+│   ├── .env             ← configurações (URL do Biblivre, etc.)
+│   ├── app/             ← código do servidor
+│   ├── static/          ← frontend compilado (gerado pelo npm run build)
+│   └── venv/            ← ambiente Python (gerado na instalação)
+└── frontend/
+    ├── src/
+    │   └── data/
+    │       └── cddPresets.csv  ← lista de categorias CDD
+    └── ...
+```
+
+---
+
+## Solução de problemas
+
+**O sistema não abre / página em branco**
+- Verifique se o Biblivre está rodando: abra `http://localhost:8080/Biblivre5` no navegador
+- Verifique se a URL no `.env` está correta
+
+**"Python não encontrado"**
+- Reinstale o Python marcando a opção **"Add Python to PATH"**
+
+**"npm não encontrado"**
+- Instale o Node.js em https://nodejs.org e abra um novo terminal
+
+**Frontend não aparece (só a API responde em `/docs`)**
+- O frontend não foi compilado. Entre em `frontend\` e rode `npm run build`
